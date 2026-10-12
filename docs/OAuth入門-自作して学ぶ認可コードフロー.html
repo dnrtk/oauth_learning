@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OAuth 2.0 入門 — Python で自作して学ぶ認可コードフロー</title>
+<style>
+:root {
+  --bg: #fbfbfc; --fg: #1d1d1f; --card: #ffffff; --muted: #63636b; --border: #dcdce2;
+  --accent: #1f6feb; --code-bg: #f1f1f4;
+  --client: #1f6feb; --auth: #b35f00; --resource: #7c3aed;
+  --note: #2f6fb0; --warning: #9a6700; --error: #c4262e; --success: #1a7f37;
+  --note-bg: #eef5fc; --warning-bg: #fff8e5; --error-bg: #fdeeee; --success-bg: #ecf8ef;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15151a; --fg: #e7e7ec; --card: #1e1e25; --muted: #a2a2ad; --border: #383842;
+    --accent: #58a6ff; --code-bg: #26262e;
+    --client: #58a6ff; --auth: #f0a040; --resource: #b48cff;
+    --note: #79b8ff; --warning: #e3b341; --error: #ff7b72; --success: #56d364;
+    --note-bg: #16263a; --warning-bg: #2e2612; --error-bg: #351a1c; --success-bg: #14301d;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+  font-size: 1rem; line-height: 1.85;
+}
+.layout { display: grid; grid-template-columns: 1fr; max-width: 74rem; margin: 0 auto; }
+@media (min-width: 64rem) {
+  .layout { grid-template-columns: 17rem minmax(0, 1fr); gap: 2rem; }
+  nav.toc { position: sticky; top: 0; max-height: 100vh; overflow-y: auto; }
+}
+nav.toc { padding: 1rem; font-size: 0.9rem; border-right: 1px solid var(--border); }
+nav.toc ol { padding-left: 1.2rem; margin: 0.25rem 0; }
+nav.toc a { color: var(--fg); text-decoration: none; }
+nav.toc a:hover { color: var(--accent); text-decoration: underline; }
+article { padding: 1rem; min-width: 0; }
+header.doc { border-bottom: 2px solid var(--border); margin-bottom: 1.5rem; }
+header.doc h1 { font-size: 1.8rem; line-height: 1.4; margin-bottom: 0.5rem; }
+header.doc dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.2rem 1rem; font-size: 0.9rem; }
+header.doc dt { color: var(--muted); }
+header.doc dd { margin: 0; }
+h2 { font-size: 1.45rem; margin-top: 3rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--border); }
+h3 { font-size: 1.15rem; margin-top: 2rem; }
+h4 { font-size: 1rem; margin-top: 1.5rem; }
+a { color: var(--accent); }
+code, pre, kbd { font-family: "SF Mono", Menlo, Consolas, "Yu Gothic", monospace; font-size: 0.875rem; }
+:not(pre) > code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; word-break: break-word; }
+pre { background: var(--code-bg); padding: 0.9rem 1rem; border-radius: 8px; overflow-x: auto; line-height: 1.6; }
+kbd { border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 0.3em; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; }
+table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+th, td { border: 1px solid var(--border); padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
+th { background: var(--code-bg); }
+aside, .callout { border-left: 4px solid; border-radius: 6px; padding: 0.6rem 1rem; margin: 1rem 0; }
+aside > :first-child, .callout > :first-child { margin-top: 0; }
+aside > :last-child, .callout > :last-child { margin-bottom: 0; }
+.note { border-color: var(--note); background: var(--note-bg); }
+.warning { border-color: var(--warning); background: var(--warning-bg); }
+.error { border-color: var(--error); background: var(--error-bg); }
+.success { border-color: var(--success); background: var(--success-bg); }
+.label { font-weight: bold; display: block; }
+.note .label { color: var(--note); } .warning .label { color: var(--warning); }
+.error .label { color: var(--error); } .success .label { color: var(--success); }
+.muted { color: var(--muted); font-size: 0.9rem; }
+.role-client { color: var(--client); font-weight: bold; }
+.role-auth { color: var(--auth); font-weight: bold; }
+.role-resource { color: var(--resource); font-weight: bold; }
+details { border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem 1rem; margin: 1rem 0; background: var(--card); }
+details > summary { cursor: pointer; font-weight: bold; }
+details[open] > summary { margin-bottom: 0.5rem; }
+figure { margin: 1.5rem 0; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; }
+figcaption { font-size: 0.9rem; color: var(--muted); margin-top: 0.5rem; }
+pre.mermaid { background: transparent; text-align: center; }
+.exercise { border: 1px solid var(--border); border-radius: 10px; padding: 0.25rem 1.25rem 1rem; margin: 1.5rem 0; background: var(--card); }
+.exercise h4 { margin-top: 1rem; }
+.steps { counter-reset: step; list-style: none; padding-left: 0; }
+.steps > li { counter-increment: step; position: relative; padding-left: 2.4rem; margin: 0.8rem 0; }
+.steps > li::before { content: counter(step); position: absolute; left: 0; top: 0.1rem; width: 1.7rem; height: 1.7rem;
+  border-radius: 50%; background: var(--accent); color: var(--bg); text-align: center; line-height: 1.7rem; font-size: 0.85rem; font-weight: bold; }
+ins { text-decoration: none; background: var(--success-bg); }
+del { background: var(--error-bg); }
+</style>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "default", sequence: { showSequenceNumbers: true } });
+</script>
+</head>
+<body>
+<div class="layout">
+
+<nav class="toc" aria-label="目次">
+<strong>目次</strong>
+<ol>
+  <li><a href="#intro">はじめに</a></li>
+  <li><a href="#why">なぜ OAuth が必要なのか</a></li>
+  <li><a href="#authn-authz">認証と認可の違い</a></li>
+  <li><a href="#roles">4 人の登場人物</a></li>
+  <li><a href="#web-basics">前提となる Web の仕組み</a></li>
+  <li><a href="#flow">認可コードフローの全体像</a></li>
+  <li><a href="#tokens">トークンとスコープ</a></li>
+  <li><a href="#run">完成版を動かしてみる</a></li>
+  <li><a href="#exercises">演習: 自分で実装する</a>
+    <ol>
+      <li><a href="#ex1">認可リクエスト</a></li>
+      <li><a href="#ex2">リクエスト検証</a></li>
+      <li><a href="#ex3">認可コード発行</a></li>
+      <li><a href="#ex4">コールバック</a></li>
+      <li><a href="#ex5">トークンエンドポイント</a></li>
+      <li><a href="#ex6">API の保護</a></li>
+      <li><a href="#ex7">PKCE</a></li>
+      <li><a href="#ex8">リフレッシュ</a></li>
+    </ol>
+  </li>
+  <li><a href="#security">攻撃と対策を体験する</a></li>
+  <li><a href="#oidc">OAuth と OpenID Connect</a></li>
+  <li><a href="#grants">他のフローと OAuth 2.1</a></li>
+  <li><a href="#production">本番で使うときの注意</a></li>
+  <li><a href="#glossary">用語集</a></li>
+  <li><a href="#references">参考資料</a></li>
+</ol>
+</nav>
+
+<article>
+<header class="doc">
+<h1>OAuth 2.0 入門<br><small>Python で自作して学ぶ認可コードフロー</small></h1>
+<dl>
+  <dt>作成日</dt><dd>2026-10-10</dd>
+  <dt>対象読者</dt><dd>Python は書けるが、認証・認可の仕組みにはあまり詳しくない方</dd>
+  <dt>題材</dt><dd>OAuth 2.0 認可コードフロー + PKCE + リフレッシュトークン（RFC 6749 / 6750 / 7636 / 7662）</dd>
+  <dt>教材コード</dt><dd>このリポジトリ（<code>src/oauth_sample/</code>）。Python 3.14 / 標準ライブラリのみ / uv</dd>
+  <dt>所要時間の目安</dt><dd>読む: 1〜1.5 時間、演習: 3〜5 時間</dd>
+  <dt>作成</dt><dd>Claude Opus 5.5（claude-opus-5-5）</dd>
+</dl>
+</header>
+
+<!-- ================================================================== -->
+<section id="intro">
+<h2>1. はじめに</h2>
+
+<p>「Google でログイン」「GitHub と連携する」——普段何気なく押しているこれらのボタンの裏側では、<strong>OAuth（オーオース）</strong> という仕組みが動いています。OAuth は仕様書を読むだけだと用語が多く抽象的に感じますが、実際に自分の手で作ってみると「なぜこの手順が必要なのか」が驚くほどすっきり理解できます。</p>
+
+<p>この教材では、OAuth に登場する 3 つのサーバー（<span class="role-client">クライアント</span>・<span class="role-auth">認可サーバー</span>・<span class="role-resource">リソースサーバー</span>）を <strong>すべて自分で</strong>、Python の標準ライブラリだけで実装します。Web フレームワークも OAuth ライブラリも使わないので、隠れた「魔法」はありません。ブラウザとサーバーの間を流れる HTTP のやりとりがすべてターミナルに表示されるので、目で見ながら理解を深められます。</p>
+
+<h3>この教材のゴール</h3>
+<ul>
+  <li>OAuth が「何の問題を解決するのか」を自分の言葉で説明できる</li>
+  <li>認可コードフローの各ステップで、誰が誰に何を送っているかを説明できる</li>
+  <li><code>state</code>、PKCE、<code>redirect_uri</code> の完全一致検証などが「どんな攻撃を防いでいるのか」を説明できる</li>
+  <li>OAuth（認可）と OpenID Connect（認証）の違いを説明できる</li>
+</ul>
+
+<h3>進め方</h3>
+<ol class="steps">
+  <li><a href="#why">2 章</a>〜<a href="#tokens">7 章</a>を読んで、用語と全体の流れをつかみます（コードはまだ書きません）。</li>
+  <li><a href="#run">8 章</a>で完成版を動かし、ブラウザとターミナルのログで実際の流れを観察します。</li>
+  <li><a href="#exercises">9 章</a>の演習で、穴あきのコードを自分で埋めていきます。テストで答え合わせができます。</li>
+  <li><a href="#security">10 章</a>で、わざと攻撃してみて対策の効果を確かめます。</li>
+  <li><a href="#oidc">11 章</a>以降で、実務につながる発展的な話題を押さえます。</li>
+</ol>
+
+<aside class="note">
+<span class="label">ℹ 用語について</span>
+<p>初めて出てくる用語は太字で示し、その場で説明します。忘れてしまったら末尾の<a href="#glossary">用語集</a>を見てください。</p>
+</aside>
+</section>
+
+<!-- ================================================================== -->
+<section id="why">
+<h2>2. なぜ OAuth が必要なのか</h2>
+
+<h3>2.1 パスワードを渡してしまう問題</h3>
+<p>次のような場面を考えてみましょう。あなたは「メモ管理サービス」にたくさんのメモを保存しています。そこへ、新しい「メモ閲覧アプリ」が登場しました。このアプリはメモ管理サービスのメモをきれいに一覧表示してくれるそうです。</p>
+<p>OAuth が普及する前は、このような連携を実現するために <strong>メモ管理サービスの ID とパスワードをメモ閲覧アプリに入力する</strong> という方法がよく使われていました。アプリはそのパスワードで、あなたになりすましてメモ管理サービスにログインするわけです。</p>
+
+<figure>
+<pre class="mermaid">
+flowchart LR
+  U["あなた"] -- "① ID とパスワードを入力" --> C["メモ閲覧アプリ<br/>(第三者)"]
+  C -- "② あなたになりすましてログイン" --> S["メモ管理サービス"]
+  S -- "③ 全データにアクセスできてしまう" --> C
+</pre>
+<figcaption>図 2-1: OAuth 以前のやり方（パスワードを第三者に渡す）</figcaption>
+</figure>
+
+<p>この方法には深刻な問題があります。</p>
+<div class="table-wrap"><table>
+<thead><tr><th>問題</th><th>具体的に何が困るか</th></tr></thead>
+<tbody>
+<tr><td>権限が大きすぎる</td><td>「メモを読む」だけでよいのに、パスワードがあればメモの削除、パスワード変更、退会まで何でもできてしまう。</td></tr>
+<tr><td>漏洩時の被害が大きい</td><td>アプリがパスワードを保存していて、そのアプリが攻撃されるとパスワードそのものが漏れる。同じパスワードを他でも使い回していれば被害はさらに広がる。</td></tr>
+<tr><td>取り消せない</td><td>アプリとの連携だけをやめたくても、パスワードを変更するしかない。するとパスワードを渡した他のすべてのアプリも使えなくなる。</td></tr>
+<tr><td>多要素認証と相性が悪い</td><td>ワンタイムパスワードなどを使っていると、アプリが代わりにログインすることがそもそもできない。</td></tr>
+</tbody>
+</table></div>
+
+<h3>2.2 OAuth の解決策: 「合鍵」ではなく「期限付きの専用キー」を渡す</h3>
+<p>ホテルを思い浮かべてください。ホテルはお客さんに建物のマスターキーを渡しません。フロントで本人確認をしたうえで、<strong>その部屋だけ</strong>を、<strong>宿泊期間中だけ</strong>開けられる <strong>カードキー</strong> を発行します。カードキーを無くしても、フロントで無効化すれば済みます。</p>
+<p>OAuth はこれと同じ発想です。</p>
+<ul>
+  <li>あなたは、パスワードを <strong>メモ管理サービス自身（の認可サーバー）にだけ</strong> 入力します。</li>
+  <li>メモ管理サービスは、あなたの同意を得たうえで、メモ閲覧アプリに <strong>アクセストークン</strong> という「カードキー」を発行します。</li>
+  <li>アクセストークンには「メモの読み取りだけ」といった <strong>権限の範囲（スコープ）</strong> と <strong>有効期限</strong> があり、いつでも <strong>取り消し</strong> できます。</li>
+</ul>
+
+<figure>
+<pre class="mermaid">
+flowchart LR
+  U["あなた"] -- "① パスワードはここにだけ入力<br/>② 「メモの読み取り」を許可" --> A["メモ管理サービスの<br/>認可サーバー"]
+  A -- "③ アクセストークン<br/>(読み取りのみ・2 分間有効)" --> C["メモ閲覧アプリ"]
+  C -- "④ トークンを見せてメモを取得" --> R["メモ管理サービスの<br/>API (リソースサーバー)"]
+</pre>
+<figcaption>図 2-2: OAuth のやり方（パスワードは渡さず、限定された権限だけを渡す）</figcaption>
+</figure>
+
+<aside class="success">
+<span class="label">✔ ポイント</span>
+<p>OAuth の本質は「<strong>パスワードを渡さずに、限定された権限だけを第三者アプリに委ねる</strong>」ことです。これを <strong>権限の委譲（delegation）</strong> と呼びます。</p>
+</aside>
+</section>
+
+<!-- ================================================================== -->
+<section id="authn-authz">
+<h2>3. 認証と認可の違い</h2>
+<p>認証系の話で最初につまずきやすいのが、よく似た 2 つの言葉です。</p>
+<div class="table-wrap"><table>
+<thead><tr><th></th><th>認証（Authentication, AuthN）</th><th>認可（Authorization, AuthZ）</th></tr></thead>
+<tbody>
+<tr><th>問い</th><td>あなたは <strong>誰</strong> ですか？</td><td>あなたは <strong>何をしてよい</strong> ですか？</td></tr>
+<tr><th>身近な例</th><td>空港で パスポートを見せて本人確認する</td><td>搭乗券に書かれた便・座席にだけ乗れる</td></tr>
+<tr><th>Web での例</th><td>ID とパスワードでログインする</td><td>「このアプリはメモの読み取りだけ可能」</td></tr>
+<tr><th>代表的な仕組み</th><td>パスワード、多要素認証、<strong>OpenID Connect</strong></td><td><strong>OAuth 2.0</strong></td></tr>
+</tbody>
+</table></div>
+
+<p><strong>OAuth は「認可」のための仕組み</strong>です。名前の Auth は Authorization の略です。OAuth の流れの中でユーザーはログイン（認証）をしますが、それは認可サーバーが「誰が許可を出しているのか」を確かめるための手段にすぎず、OAuth の目的そのものではありません。</p>
+
+<aside class="warning">
+<span class="label">⚠ よくある誤解</span>
+<p>「OAuth でログイン」という表現をよく目にしますが、素の OAuth 2.0 をそのまま「ログイン（認証）」に使うと安全でない場合があります。認証に使いたいときは OAuth を拡張した <strong>OpenID Connect</strong> を使います。理由は<a href="#oidc">11 章</a>で説明します。</p>
+</aside>
+</section>
+
+<!-- ================================================================== -->
+<section id="roles">
+<h2>4. 4 人の登場人物</h2>
+<p>OAuth 2.0 の仕様（RFC 6749）には 4 つの役割（ロール）が登場します。この教材のコードとの対応も合わせて示します。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>役割</th><th>説明</th><th>この教材では</th></tr></thead>
+<tbody>
+<tr><td><strong>リソースオーナー</strong><br>Resource Owner</td><td>データの持ち主。通常はユーザー本人。許可を出す人。</td><td>あなた（ブラウザを操作する人）。アカウント <code>alice</code> / <code>bob</code></td></tr>
+<tr><td><span class="role-client">クライアント</span><br>Client</td><td>ユーザーのデータを使いたいアプリ。「クライアント」という名前ですが、ブラウザのことではなく <strong>第三者アプリのサーバー</strong> を指すことが多いので注意。</td><td>メモ閲覧アプリ<br><code>http://127.0.0.1:8000</code><br><code>client.py</code></td></tr>
+<tr><td><span class="role-auth">認可サーバー</span><br>Authorization Server</td><td>ユーザーをログインさせ、同意を得て、トークンを発行する。</td><td><code>http://127.0.0.1:9000</code><br><code>auth_server.py</code></td></tr>
+<tr><td><span class="role-resource">リソースサーバー</span><br>Resource Server</td><td>ユーザーのデータを持つ API。トークンを確かめてからデータを返す。</td><td>プロフィール・メモ API<br><code>http://127.0.0.1:9100</code><br><code>resource_server.py</code></td></tr>
+</tbody>
+</table></div>
+
+<p>Google を例にすると、認可サーバーは <code>accounts.google.com</code>、リソースサーバーは Google Drive API や Gmail API、クライアントは「Google ドライブと連携するアプリ」です。現実には認可サーバーとリソースサーバーは同じ会社が運営していることがほとんどですが、役割としては別物です。</p>
+
+<aside class="note">
+<span class="label">ℹ クライアントの種類</span>
+<p>クライアントは <code>client_secret</code>（クライアント用のパスワード）を安全に保管できるかどうかで 2 種類に分かれます。</p>
+<ul>
+<li><strong>コンフィデンシャルクライアント</strong>: サーバー上で動く Web アプリなど。秘密をサーバー内に隠せる。<strong>この教材のクライアントはこちら。</strong></li>
+<li><strong>パブリッククライアント</strong>: スマホアプリ、ブラウザだけで動く SPA など。配布物を解析されると秘密が漏れるため、秘密を持てない。</li>
+</ul>
+</aside>
+</section>
+
+<!-- ================================================================== -->
+<section id="web-basics">
+<h2>5. 前提となる Web の仕組み</h2>
+<p>OAuth は新しい通信技術を発明したわけではなく、<strong>既存の HTTP の機能を組み合わせた「手順の取り決め」</strong>です。そのため、以下の Web の基本を押さえておくと理解がぐっと楽になります。知っている項目は読み飛ばして構いません。</p>
+
+<h3>5.1 HTTP リクエストとレスポンス</h3>
+<p>ブラウザやプログラムはサーバーに <strong>リクエスト</strong> を送り、サーバーは <strong>レスポンス</strong> を返します。リクエストには「メソッド（GET / POST など）」「パス」「ヘッダー」「ボディ」があり、レスポンスには「ステータスコード（200, 302, 401 など）」「ヘッダー」「ボディ」があります。</p>
+<pre><code class="language-http">GET /api/profile HTTP/1.1          ← メソッドとパス
+Host: 127.0.0.1:9100              ← ヘッダー
+Authorization: Bearer abc123...   ← ヘッダー (後で出てくるアクセストークン)
+
+HTTP/1.1 200 OK                   ← ステータスコード
+Content-Type: application/json
+
+{"name": "Alice Liddell", ...}    ← ボディ</code></pre>
+
+<h3>5.2 クエリパラメータと URL エンコード</h3>
+<p>URL の <code>?</code> 以降は <strong>クエリパラメータ</strong> と呼ばれ、<code>key=value</code> を <code>&amp;</code> でつないで値を渡します。値に <code>/</code> や <code>:</code>、空白などの特別な文字が含まれる場合は <strong>URL エンコード</strong>（<code>%2F</code> のような形への変換）が必要です。Python では <code>urllib.parse.urlencode()</code> が自動でやってくれます。</p>
+<pre><code class="language-python">&gt;&gt;&gt; urllib.parse.urlencode({"redirect_uri": "http://127.0.0.1:8000/callback", "scope": "profile notes:read"})
+'redirect_uri=http%3A%2F%2F127.0.0.1%3A8000%2Fcallback&amp;scope=profile+notes%3Aread'</code></pre>
+
+<h3>5.3 リダイレクト（302）— OAuth の主役</h3>
+<p>サーバーがステータス <code>302 Found</code> と <code>Location</code> ヘッダーを返すと、ブラウザは <strong>自動的に</strong> その URL へ移動します。</p>
+<pre><code class="language-http">HTTP/1.1 302 Found
+Location: http://127.0.0.1:9000/authorize?response_type=code&amp;client_id=demo-client&amp;...</code></pre>
+<p>OAuth では、クライアントと認可サーバーが <strong>ブラウザをリダイレクトで行き来させることで、ユーザーを介してメッセージを受け渡します</strong>。「クライアント → 認可サーバー」へのメッセージは URL のクエリに載せてブラウザに運ばせ、「認可サーバー → クライアント」への返事も同じようにリダイレクトで運ばせます。</p>
+
+<h3>5.4 Cookie とセッション</h3>
+<p>HTTP は本来、前のリクエストのことを覚えていません。そこでサーバーは <code>Set-Cookie</code> ヘッダーでブラウザにランダムな <strong>セッション ID</strong> を預け、ブラウザは以降のリクエストでそれを <code>Cookie</code> ヘッダーで送り返します。サーバーはセッション ID をキーにして「このブラウザは alice としてログイン済み」などの情報をサーバー側に保存しておきます。これが <strong>セッション</strong> です。</p>
+<aside class="note">
+<span class="label">ℹ この教材での注意点</span>
+<p>クライアントと認可サーバーは <strong>それぞれ別のセッション</strong> を持っています（Cookie 名は <code>client_session</code> と <code>as_session</code>）。「認可サーバーにログインしている」ことと「クライアントがトークンを持っている」ことは別の状態です。この区別は OAuth を理解するうえでとても大切です。</p>
+</aside>
+
+<h3>5.5 フロントチャネルとバックチャネル</h3>
+<p>OAuth の通信は、通り道によって 2 種類に分けて考えます。<strong>この区別が OAuth のセキュリティ設計を理解する鍵</strong>です。</p>
+<div class="table-wrap"><table>
+<thead><tr><th></th><th>フロントチャネル</th><th>バックチャネル</th></tr></thead>
+<tbody>
+<tr><th>通り道</th><td>ブラウザを経由する（リダイレクトの URL に載せる）</td><td>サーバー同士が直接 HTTP 通信する</td></tr>
+<tr><th>例</th><td>認可リクエスト、認可コードの返却</td><td>トークンリクエスト、イントロスペクション</td></tr>
+<tr><th>安全性</th><td>低い。URL はブラウザの履歴、アクセスログ、拡張機能、Referer ヘッダーなどから <strong>漏れる可能性がある</strong>。ユーザーや攻撃者が <strong>改ざんすることもできる</strong>。</td><td>高い。TLS で保護された 1 対 1 の通信で、相手を認証できる。</td></tr>
+<tr><th>載せてよいもの</th><td>漏れても単体では悪用しにくいもの（短命・使い捨ての認可コードなど）</td><td>秘密情報（client_secret、アクセストークン）</td></tr>
+</tbody>
+</table></div>
+<p>教材のログでは、バックチャネル通信に <code>※バックチャネル (ブラウザを経由しない直接通信)</code> と表示されます。</p>
+
+<h3>5.6 Base64 と Basic 認証</h3>
+<p><strong>Base64</strong> はバイト列を英数字と記号だけの文字列に変換する方式です（暗号化ではなく、誰でも元に戻せます）。<strong>Basic 認証</strong> は <code>ID:パスワード</code> を Base64 にして <code>Authorization: Basic ...</code> ヘッダーで送る、HTTP 標準の認証方式です。OAuth ではクライアントが自分の <code>client_id</code> と <code>client_secret</code> を送るのによく使われます。</p>
+<pre><code class="language-http">Authorization: Basic ZGVtby1jbGllbnQ6ZGVtby1jbGllbnQtc2VjcmV0
+                     └─ "demo-client:demo-client-secret" を Base64 にしたもの</code></pre>
+</section>
+
+<!-- ================================================================== -->
+<section id="flow">
+<h2>6. 認可コードフローの全体像</h2>
+<p>OAuth 2.0 にはいくつかの「フロー（grant type）」がありますが、Web アプリでもスマホアプリでも推奨されるのは <strong>認可コードフロー（Authorization Code Grant）</strong> です。この教材ではこれを実装します。</p>
+
+<figure>
+<pre class="mermaid">
+sequenceDiagram
+  actor U as ユーザー (ブラウザ)
+  participant C as クライアント :8000
+  participant A as 認可サーバー :9000
+  participant R as リソースサーバー :9100
+  U->>C: 「連携する」をクリック (GET /login)
+  C-->>U: 302 認可サーバーへ (client_id, redirect_uri, scope, state)
+  U->>A: GET /authorize?response_type=code&client_id=...&state=...
+  A-->>U: ログイン画面
+  U->>A: ユーザー名とパスワード (POST /login)
+  A-->>U: 同意画面「メモ閲覧アプリに次を許可しますか？」
+  U->>A: 「許可する」(POST /authorize/decision)
+  A-->>U: 302 クライアントへ (code, state)
+  U->>C: GET /callback?code=...&state=...
+  Note over C: state が自分の送ったものと一致するか検証
+  C->>A: POST /token (code + client_secret) ※バックチャネル
+  A-->>C: access_token, refresh_token
+  C->>R: GET /api/profile (Authorization: Bearer access_token)
+  R->>A: POST /introspect (このトークンは有効？) ※バックチャネル
+  A-->>R: {"active": true, "username": "alice", "scope": ...}
+  R-->>C: プロフィールの JSON
+  C-->>U: 画面に表示
+</pre>
+<figcaption>図 6-1: 認可コードフローのシーケンス図。実線は送信、点線は応答。</figcaption>
+</figure>
+
+<p>大きく 4 つのフェーズに分けると理解しやすくなります。</p>
+
+<h3>フェーズ A: 認可リクエスト（①〜③）</h3>
+<p>クライアントはユーザーを認可サーバーへリダイレクトします。このとき「どのアプリが（<code>client_id</code>）」「どんな権限を（<code>scope</code>）」「結果をどこに返してほしいか（<code>redirect_uri</code>）」をクエリに載せます。</p>
+<pre><code class="language-http">GET /authorize?response_type=code
+    &amp;client_id=demo-client
+    &amp;redirect_uri=http%3A%2F%2F127.0.0.1%3A8000%2Fcallback
+    &amp;scope=profile+notes%3Aread
+    &amp;state=Xk3pQ...（ランダム値） HTTP/1.1
+Host: 127.0.0.1:9000</code></pre>
+<div class="table-wrap"><table>
+<thead><tr><th>パラメータ</th><th>意味</th></tr></thead>
+<tbody>
+<tr><td><code>response_type=code</code></td><td>「認可コードフローで、認可コードを返してください」という宣言</td></tr>
+<tr><td><code>client_id</code></td><td>事前に認可サーバーへ登録したクライアントの ID（公開情報）</td></tr>
+<tr><td><code>redirect_uri</code></td><td>認可コードの返送先。事前登録した値と <strong>完全一致</strong> しなければならない</td></tr>
+<tr><td><code>scope</code></td><td>求める権限。スペース区切り</td></tr>
+<tr><td><code>state</code></td><td>クライアントが生成したランダム値。CSRF 攻撃を防ぐ（<a href="#security">10 章</a>）</td></tr>
+</tbody>
+</table></div>
+
+<h3>フェーズ B: ユーザーの認証と同意（④〜⑦）</h3>
+<p>認可サーバーはユーザーにログインしてもらい（すでにログイン済みならスキップ）、「メモ閲覧アプリが、プロフィールとメモの読み取りを求めています。許可しますか？」という <strong>同意画面</strong> を表示します。<strong>パスワードを入力する相手は認可サーバーであり、クライアントではありません。</strong></p>
+
+<h3>フェーズ C: 認可コードの受け取りと交換（⑧〜⑫）</h3>
+<p>ユーザーが許可すると、認可サーバーは <strong>認可コード</strong>（短命で使い捨ての引換券）を発行し、ブラウザを <code>redirect_uri</code> へリダイレクトします。</p>
+<pre><code class="language-http">HTTP/1.1 302 Found
+Location: http://127.0.0.1:8000/callback?code=SplxlOBeZQ...&amp;state=Xk3pQ...</code></pre>
+<p>クライアントは <code>state</code> を検証した後、<strong>バックチャネル</strong> で認可コードをトークンと交換します。このとき <code>client_secret</code> で自分が本物のクライアントであることを証明します。</p>
+<pre><code class="language-http">POST /token HTTP/1.1
+Host: 127.0.0.1:9000
+Authorization: Basic ZGVtby1jbGllbnQ6ZGVtby1jbGllbnQtc2VjcmV0
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code&amp;code=SplxlOBeZQ...&amp;redirect_uri=http%3A%2F%2F127.0.0.1%3A8000%2Fcallback</code></pre>
+<pre><code class="language-json">{
+  "access_token": "2YotnFZFEjr1zCsicMWpAA...",
+  "token_type": "Bearer",
+  "expires_in": 120,
+  "refresh_token": "tGzv3JOkF0XG5Qx2TlKWIA...",
+  "scope": "profile notes:read"
+}</code></pre>
+
+<aside class="note">
+<span class="label">ℹ なぜ直接トークンを返さず、わざわざ「コード」を挟むのか？</span>
+<p>認可サーバーからクライアントへの返事はブラウザ経由（フロントチャネル）なので、URL が履歴やログに残るなど漏れやすい経路です。そこにアクセストークンを直接載せると、漏れたら即座に悪用されます。</p>
+<p>そこで、フロントチャネルには <strong>単体では使えない引換券（認可コード）</strong> だけを載せ、本物のトークンは安全なバックチャネルで、<strong>クライアント認証付きで</strong> 受け取るようにしています。認可コードは「短命（この教材では 60 秒）」「1 回限り」なので、漏れても被害を抑えられます。さらに PKCE（<a href="#ex7">演習 7</a>）を使えば、漏れたコードを第三者が交換することもできなくなります。</p>
+</aside>
+
+<h3>フェーズ D: API の呼び出し（⑬〜⑱）</h3>
+<p>クライアントは <code>Authorization: Bearer &lt;アクセストークン&gt;</code> ヘッダーを付けて API を呼び出します。リソースサーバーはトークンが有効か、必要なスコープを持っているかを確かめ、そのトークンの持ち主（alice）のデータだけを返します。</p>
+<p>この教材では、リソースサーバーは認可サーバーの <strong>イントロスペクションエンドポイント</strong>（RFC 7662）に「このトークンは有効？」と問い合わせて確認します。もう一つの代表的な方式（JWT）は<a href="#tokens">次章</a>で紹介します。</p>
+</section>
+
+<!-- ================================================================== -->
+<section id="tokens">
+<h2>7. トークンとスコープ</h2>
+
+<h3>7.1 アクセストークンは「持参人払い」</h3>
+<p>アクセストークンの <code>token_type</code> は <code>Bearer</code>（持参人）です。これは「<strong>このトークンを持ってきた人は誰であれ、権限を持つものとして扱う</strong>」という意味です。お金の引換券と同じで、盗まれたら盗んだ人が使えてしまいます。だからこそ、</p>
+<ul>
+  <li>有効期限を短くする（この教材では 120 秒。実務では数分〜1 時間程度）</li>
+  <li>必ず HTTPS で送る</li>
+  <li>URL のクエリに載せず、<code>Authorization</code> ヘッダーで送る</li>
+  <li>ログや画面に出さない（この教材は学習のためにあえて表示しています）</li>
+</ul>
+<p>といった対策が取られます。</p>
+
+<h3>7.2 スコープ — 権限の範囲</h3>
+<p><strong>スコープ</strong> は「このトークンで何ができるか」を表す文字列です。この教材では次の 2 つを用意しています。</p>
+<div class="table-wrap"><table>
+<thead><tr><th>スコープ</th><th>意味</th><th>必要な API</th></tr></thead>
+<tbody>
+<tr><td><code>profile</code></td><td>プロフィール（名前・メールアドレス）の読み取り</td><td><code>GET /api/profile</code></td></tr>
+<tr><td><code>notes:read</code></td><td>メモの読み取り</td><td><code>GET /api/notes</code></td></tr>
+</tbody>
+</table></div>
+<p>スコープの名前や粒度はサービスごとに自由に決められます（例: GitHub の <code>repo</code>、Google の <code>https://www.googleapis.com/auth/drive.readonly</code>）。クライアントは <strong>必要最小限</strong> のスコープだけを要求するのがマナーです。</p>
+
+<h3>7.3 リフレッシュトークン</h3>
+<p>アクセストークンを短命にすると、頻繁に期限切れになります。そのたびにユーザーに同意画面を見せるのは不便です。そこで、トークンエンドポイントは長命の <strong>リフレッシュトークン</strong> も一緒に返します。クライアントはアクセストークンが切れたら、リフレッシュトークンを使って（バックチャネルで）新しいアクセストークンをもらいます。</p>
+<p>リフレッシュトークンは <strong>認可サーバーにだけ送り、リソースサーバーには決して送りません</strong>。この教材では、使うたびに新しいリフレッシュトークンに入れ替える <strong>ローテーション</strong> も実装します（<a href="#ex8">演習 8</a>）。</p>
+
+<h3>7.4 トークンの中身: 不透明トークンと JWT</h3>
+<div class="table-wrap"><table>
+<thead><tr><th></th><th>不透明（opaque）トークン</th><th>JWT（JSON Web Token）</th></tr></thead>
+<tbody>
+<tr><th>中身</th><td>意味のないランダム文字列。情報は認可サーバーの DB にある</td><td>ユーザー・スコープ・期限などを JSON にして電子署名したもの</td></tr>
+<tr><th>検証方法</th><td>認可サーバーに問い合わせる（イントロスペクション）</td><td>リソースサーバーが署名と期限を自分で検証する</td></tr>
+<tr><th>長所</th><td>即座に失効できる。中身が漏れない</td><td>問い合わせが不要で速い</td></tr>
+<tr><th>短所</th><td>API 呼び出しのたびに問い合わせが発生する</td><td>期限前の失効が難しい。署名検証の実装を誤ると危険</td></tr>
+</tbody>
+</table></div>
+<p>この教材は仕組みが見えやすい <strong>不透明トークン + イントロスペクション</strong> を採用しています。</p>
+</section>
+
+<!-- ================================================================== -->
+<section id="run">
+<h2>8. 完成版を動かしてみる</h2>
+
+<h3>8.1 準備</h3>
+<p>Python のパッケージ管理ツール <a href="https://docs.astral.sh/uv/">uv</a> を使います。プロジェクトのルートで次を実行してください（Python 3.14 が無ければ uv が自動で用意します）。</p>
+<pre><code class="language-bash">uv sync</code></pre>
+
+<h3>8.2 起動</h3>
+<pre><code class="language-bash">uv run oauth-sample solution</code></pre>
+<p>3 つのサーバーが起動し、ターミナルに次のように表示されます。</p>
+<pre><code class="language-text">   クライアント       http://127.0.0.1:8000   ← ブラウザでここを開いてください
+   認可サーバー       http://127.0.0.1:9000
+   リソースサーバー   http://127.0.0.1:9100</code></pre>
+<p>終了するときはターミナルで <kbd>Ctrl</kbd>+<kbd>C</kbd> を押します。</p>
+
+<h3>8.3 観察ツアー</h3>
+<p>ブラウザとターミナルを左右に並べて、次の手順で進めてください。各ページの <strong>上部の色帯</strong> で、いまどのサーバーの画面にいるかが分かります（<span class="role-client">青 = クライアント</span>、<span class="role-auth">橙 = 認可サーバー</span>、<span class="role-resource">紫 = リソースサーバー</span>）。</p>
+<ol class="steps">
+  <li><code>http://127.0.0.1:8000</code> を開き、「認可サーバーと連携する」を押します。<br>
+    ターミナルに <code>[クライアント] → 302 Location: http://127.0.0.1:9000/authorize?...</code> と表示され、ブラウザが認可サーバーへ移動したことが分かります。アドレスバーの URL にも <code>client_id</code> や <code>state</code> が見えるはずです。</li>
+  <li>認可サーバーのログイン画面で <code>alice</code> / <code>alice-pass</code> を入力します。<br>
+    ログでは <code>password = ********</code> と隠していますが、パスワードが届いているのは <strong>認可サーバーだけ</strong> であることを確認してください。</li>
+  <li>同意画面で「許可する」を押します。<br>
+    <code>[認可サーバー] → 302 Location: http://127.0.0.1:8000/callback?code=...&amp;state=...</code> の直後に、<code>[クライアント] → POST http://127.0.0.1:9000/token ※バックチャネル</code> が続くのを確認しましょう。</li>
+  <li>クライアントのトップページに戻り、受け取ったトークンが表示されます。「プロフィールを取得」を押します。<br>
+    クライアント → リソースサーバー → 認可サーバー（イントロスペクション）と問い合わせが連鎖するのがログで分かります。</li>
+  <li>別タブで <code>http://127.0.0.1:9000/</code>（認可サーバーのダッシュボード）を開きます。発行された認可コードが「使用済み」になっていること、アクセストークンの残り時間などが確認できます。</li>
+  <li>2 分待ってから再度「プロフィールを取得」を押すと <code>401</code> になります。「トークンを更新 (refresh)」を押すと再び取得できるようになります。</li>
+  <li>ダッシュボードで「許可を取り消す」を押してから API を呼ぶと、やはり <code>401</code> になります。これがパスワード方式ではできなかった「連携だけの取り消し」です。</li>
+</ol>
+
+<details>
+<summary>ターミナルのログの例（認可コードを受け取ってからトークンを得るまで）</summary>
+<pre><code class="language-text">[クライアント] ← GET /callback
+[クライアント]       query code = 0iQbH4r...
+[クライアント]       query state = Xk3pQ...
+[クライアント] → POST http://127.0.0.1:9000/token   ※バックチャネル (ブラウザを経由しない直接通信)
+[クライアント]       header Authorization: Basic ZGVtby1jbGllbnQ6ZGVtby1jbGllbnQtc2VjcmV0
+[クライアント]       form grant_type = authorization_code
+[クライアント]       form code = 0iQbH4r...
+[クライアント]       form redirect_uri = http://127.0.0.1:8000/callback
+[クライアント]       form code_verifier = q8Wn0...
+[認可サーバー] ← POST /token
+   ...
+[認可サーバー] → 200 {"access_token": "...", "token_type": "Bearer", "expires_in": 120, ...}
+[クライアント] ← 200 {"access_token": "...", ...}
+[クライアント] → 302 Location: /   ※ブラウザにリダイレクトを指示</code></pre>
+</details>
+</section>
+
+<!-- ================================================================== -->
+<section id="exercises">
+<h2>9. 演習: 自分で実装する</h2>
+
+<h3>9.1 演習の進め方</h3>
+<p>演習用のコードは <code>src/oauth_sample/exercise/</code> にあります。完成版（<code>solution/</code>）から OAuth の核心部分だけを取り除いたもので、該当箇所には次のように <code>TODO</code> とヒントが書かれています。</p>
+<pre><code class="language-python">def build_authorization_url(settings: Settings, state: str, code_challenge: str | None) -&gt; str:
+    """認可サーバーの認可エンドポイントへ飛ばすための URL を組み立てる。"""
+    # [演習 1-1] 認可リクエストの URL を組み立てる
+    # TODO: ここを実装してください
+    # ヒント: 行き先は settings.authorization_endpoint です。
+    # ...
+    raise NotImplementedError("演習 1-1: 認可リクエストの URL を組み立てる")
+    # [/演習 1-1]</code></pre>
+<p><code>raise NotImplementedError(...)</code> の行を消して、そこに実装を書いてください。HTTP サーバーや画面、セッション管理などの「下回り」はすでに用意してあるので、OAuth の処理だけに集中できます。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>やりたいこと</th><th>コマンド</th></tr></thead>
+<tbody>
+<tr><td>演習 N のテストだけ実行</td><td><code>uv run pytest -k stepN</code>（例: <code>-k step1</code>）</td></tr>
+<tr><td>演習版のテストをすべて実行</td><td><code>uv run pytest</code></td></tr>
+<tr><td>演習版をブラウザで動かす（演習 6 まで）</td><td><code>uv run oauth-sample exercise --no-pkce</code></td></tr>
+<tr><td>演習版をブラウザで動かす（演習 7 以降）</td><td><code>uv run oauth-sample exercise</code></td></tr>
+<tr><td>解答版を動かす / テストする</td><td><code>uv run oauth-sample solution</code> / <code>uv run pytest --impl solution</code></td></tr>
+<tr><td>型チェック</td><td><code>uv run mypy --strict src</code></td></tr>
+</tbody>
+</table></div>
+
+<aside class="warning">
+<span class="label">⚠ 注意</span>
+<ul>
+<li>コードを変更したら、サーバーを <kbd>Ctrl</kbd>+<kbd>C</kbd> で止めて起動し直してください（自動では再読み込みされません）。</li>
+<li>演習 7（PKCE）に取り組むまでは <code>--no-pkce</code> を付けて起動します。付けないと PKCE の未実装箇所に到達してエラー画面（501）になります。</li>
+<li>未実装の箇所に到達すると、ブラウザに「未実装の演習があります」と表示され、ターミナルにも演習番号が出ます。どこから手を付ければよいかの手がかりにしてください。</li>
+<li>詰まったら <code>solution/</code> の同じ名前の関数を見て構いません。見た後に、自分の言葉で「なぜそうするのか」を説明できれば十分です。</li>
+</ul>
+</aside>
+
+<h3>9.2 演習の一覧</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>演習</th><th>担当</th><th>ファイル / 関数</th><th>テーマ</th></tr></thead>
+<tbody>
+<tr><td><a href="#ex1">1-1</a></td><td class="role-client">クライアント</td><td><code>client.py</code> <code>build_authorization_url</code></td><td>認可リクエスト</td></tr>
+<tr><td><a href="#ex2">2-1</a></td><td class="role-auth">認可サーバー</td><td><code>auth_server.py</code> <code>validate_authorization_request</code></td><td>リクエスト検証・オープンリダイレクタ対策</td></tr>
+<tr><td><a href="#ex3">3-1, 3-2</a></td><td class="role-auth">認可サーバー</td><td><code>issue_authorization_code</code> / <code>build_authorization_response_url</code></td><td>認可コード発行</td></tr>
+<tr><td><a href="#ex4">4-1, 4-2</a></td><td class="role-client">クライアント</td><td><code>verify_state</code> / <code>exchange_code_for_token</code></td><td>state 検証・トークンリクエスト</td></tr>
+<tr><td><a href="#ex5">5-1〜5-3</a></td><td class="role-auth">認可サーバー</td><td><code>authenticate_client</code> / <code>redeem_authorization_code</code> / <code>issue_tokens</code></td><td>トークンエンドポイント</td></tr>
+<tr><td><a href="#ex6">6-1〜6-5</a></td><td>3 者すべて</td><td><code>introspect</code> / <code>extract_bearer_token</code> / <code>introspect_token</code> / <code>has_scope</code> / <code>call_resource_api</code></td><td>API の保護</td></tr>
+<tr><td><a href="#ex7">7-1〜7-4</a></td><td>クライアント・認可サーバー</td><td><code>pkce.py</code> 全体 / <code>extract_pkce_challenge</code></td><td>PKCE</td></tr>
+<tr><td><a href="#ex8">8-1, 8-2</a></td><td>クライアント・認可サーバー</td><td><code>exchange_refresh_token</code> / <code>refresh_access_token</code></td><td>リフレッシュトークン</td></tr>
+</tbody>
+</table></div>
+
+<p>演習は <strong>フローの順番どおり</strong> に並んでいます。演習 1〜6 が終わると、PKCE なしで一通りのフローがブラウザで動くようになります。</p>
+
+<!-- ---------------------------------------------------------------- -->
+<section class="exercise" id="ex1">
+<h3>演習 1: 認可リクエストを組み立てる <span class="role-client">［クライアント］</span></h3>
+<h4>やること</h4>
+<p><code>client.py</code> の <code>build_authorization_url()</code> を実装し、ユーザーを認可サーバーへ送り出す URL を作ります。フロー図の②にあたります。</p>
+<h4>考え方</h4>
+<p>この URL は <strong>クライアントから認可サーバーへの手紙</strong> です。ただし直接届けるのではなく、ブラウザに「この URL へ移動して」と頼んで運んでもらいます（フロントチャネル）。手紙に書く内容は<a href="#flow">6 章フェーズ A</a> の表のとおりです。</p>
+<p>呼び出し元の <code>ClientApp._login()</code>（演習対象外）を読むと、<code>state</code> をランダムに生成してセッションに保存してから、この関数を呼んでいることが分かります。後で認可サーバーから返ってきた <code>state</code> と照合するためです（演習 4）。</p>
+<h4>確認</h4>
+<pre><code class="language-bash">uv run pytest -k step1</code></pre>
+<details>
+<summary>解答例と解説</summary>
+<pre><code class="language-python">params = {
+    "response_type": "code",
+    "client_id": config.CLIENT_ID,
+    "redirect_uri": settings.redirect_uri,
+    "scope": config.CLIENT_SCOPE,
+    "state": state,
+}
+if code_challenge is not None:
+    params["code_challenge"] = code_challenge
+    params["code_challenge_method"] = "S256"
+return settings.authorization_endpoint + "?" + urllib.parse.urlencode(params)</code></pre>
+<p>文字列連結で <code>f"...&amp;redirect_uri={settings.redirect_uri}"</code> のように書くと、<code>:</code> や <code>/</code> がエンコードされず、値の中に <code>&amp;</code> があるとパラメータが分断されてしまいます。<code>urlencode()</code> に任せるのが確実です。</p>
+</details>
+</section>
+
+<!-- ---------------------------------------------------------------- -->
+<section class="exercise" id="ex2">
+<h3>演習 2: 認可リクエストを検証する <span class="role-auth">［認可サーバー］</span></h3>
+<h4>やること</h4>
+<p><code>auth_server.py</code> の <code>validate_authorization_request()</code> を実装します。フロー図の③で、認可サーバーが最初に行う処理です。</p>
+<h4>考え方: 2 種類のエラー</h4>
+<p>認可リクエストのエラーには、<strong>クライアントにエラーを返してよいもの</strong> と <strong>返してはいけないもの</strong> があります。</p>
+<div class="table-wrap"><table>
+<thead><tr><th>エラーの種類</th><th>例</th><th>対応</th><th>この教材での例外</th></tr></thead>
+<tbody>
+<tr><td>リダイレクト先が信用できない</td><td>未登録の <code>client_id</code>、登録と違う <code>redirect_uri</code></td><td>リダイレクトせず、認可サーバーの画面でエラー表示</td><td><code>UntrustedRedirectError</code></td></tr>
+<tr><td>それ以外</td><td><code>response_type</code> が違う、未知の <code>scope</code></td><td><code>redirect_uri</code> へ <code>error=...</code> 付きでリダイレクト</td><td><code>OAuthError</code></td></tr>
+</tbody>
+</table></div>
+<p>なぜ前者はリダイレクトしてはいけないのでしょうか。もし認可サーバーが「<code>redirect_uri</code> が不正です」というエラーを、その不正な <code>redirect_uri</code> にリダイレクトして伝えたとします。すると攻撃者は <code>https://accounts.example.com/authorize?redirect_uri=https://evil.example/</code> のような <strong>信頼できるドメインの URL</strong> を作るだけで、ユーザーを自分のサイトへ誘導できてしまいます。これを <strong>オープンリダイレクタ</strong> と呼びます。</p>
+
+<h4>考え方: redirect_uri は完全一致で</h4>
+<p><code>redirect_uri</code> の検証は「前方一致」や「ドメインが同じなら OK」ではなく、<strong>登録値との完全一致（文字列比較）</strong> で行います。部分一致を許すと、<code>http://127.0.0.1:8000/callback/../evil</code> や <code>...?next=https://evil.example/</code> のような細工で、認可コードを攻撃者が用意したページへ流出させられる恐れがあるためです。現在のセキュリティのベストプラクティス（RFC 9700）でも完全一致が求められています。</p>
+
+<h4>確認</h4>
+<pre><code class="language-bash">uv run pytest -k step2</code></pre>
+<details>
+<summary>解答例と解説</summary>
+<pre><code class="language-python">client = clients.get(query.get("client_id", ""))
+if client is None:
+    raise UntrustedRedirectError("未登録の client_id です")
+
+redirect_uri = query.get("redirect_uri")
+if redirect_uri is None or redirect_uri not in client.redirect_uris:
+    raise UntrustedRedirectError("redirect_uri が登録されている値と一致しません")
+
+if query.get("response_type") != "code":
+    raise OAuthError("unsupported_response_type", "response_type は code のみ対応しています")
+
+requested_scopes = query.get("scope", "").split()
+if not requested_scopes:
+    raise OAuthError("invalid_scope", "scope が指定されていません")
+unknown = [s for s in requested_scopes if s not in client.allowed_scopes]
+if unknown:
+    raise OAuthError("invalid_scope", f"許可されていない scope です: {' '.join(unknown)}")
+
+return AuthorizationRequest(
+    client_id=client.client_id,
+    redirect_uri=redirect_uri,
+    scope=" ".join(requested_scopes),
+    state=query.get("state"),
+)</code></pre>
+<p>検証の <strong>順番</strong> が重要です。<code>client_id</code> と <code>redirect_uri</code> を最初に確かめ、そこを通過して初めて「エラーを <code>redirect_uri</code> に返してもよい」状態になります。呼び出し元の <code>_authorize()</code> を読むと、2 種類の例外を別々に処理しているのが分かります。</p>
+</details>
+</section>
+
+<!-- ---------------------------------------------------------------- -->
+<section class="exercise" id="ex3">
+<h3>演習 3: 認可コードを発行する <span class="role-auth">［認可サーバー］</span></h3>
+<h4>やること</h4>
+<ul>
+<li><strong>3-1</strong> <code>AuthorizationServer.issue_authorization_code()</code>: 認可コードを生成し、誰がどのクライアントに何を許可したかと一緒に保存する</li>
+<li><strong>3-2</strong> <code>build_authorization_response_url()</code>: 認可コードと state を載せたリダイレクト先 URL を作る</li>
+</ul>
+<p>ユーザーが同意画面で「許可する」を押した直後（フロー図の⑧）の処理です。</p>
+<h4>考え方</h4>
+<p>認可コードは引換券なので、次の性質が必要です。</p>
+<ul>
+<li><strong>推測できない</strong>: 連番や時刻ベースではなく、暗号論的に安全な乱数（<code>secrets</code> モジュール）で作る。Python の <code>random</code> モジュールは予測可能なので使ってはいけません。</li>
+<li><strong>短命</strong>: 発行から数十秒〜数分で失効させる（RFC 6749 は最大 10 分を推奨）。</li>
+<li><strong>紐づけ</strong>: 後でトークンと交換するときに「誰の許可か」「どのクライアント宛てか」「どの <code>redirect_uri</code> で要求されたか」を照合できるよう、一緒に保存する。</li>
+</ul>
+<p><code>state</code> は認可リクエストで受け取った値を <strong>そのまま</strong> 返します。認可サーバーは state の中身を解釈しません。</p>
+<h4>確認</h4>
+<pre><code class="language-bash">uv run pytest -k step3</code></pre>
+<details>
+<summary>解答例</summary>
+<pre><code class="language-python"># 3-1
+code = secrets.token_urlsafe(32)
+record = AuthorizationCodeRecord(
+    code=code,
+    client_id=auth_request.client_id,
+    redirect_uri=auth_request.redirect_uri,
+    username=username,
+    scope=auth_request.scope,
+    expires_at=time.time() + config.AUTHORIZATION_CODE_TTL_SECONDS,
+    code_challenge=auth_request.code_challenge,
+)
+with self.lock:
+    self.codes[code] = record
+return code
+
+# 3-2
+params = {"code": code}
+if state is not None:
+    params["state"] = state
+return add_query_params(redirect_uri, params)</code></pre>
+<p><code>with self.lock:</code> は、複数のリクエストが同時に届いたときに辞書が壊れないようにするための排他制御です。この教材のサーバーはリクエストごとにスレッドを立てて処理しているためです。</p>
+</details>
+</section>
+
+<!-- ---------------------------------------------------------------- -->
+<section class="exercise" id="ex4">
+<h3>演習 4: コールバックを処理する <span class="role-client">［クライアント］</span></h3>
+<h4>やること</h4>
+<ul>
+<li><strong>4-1</strong> <code>verify_state()</code>: 返ってきた state が、自分がセッションに保存しておいた値と一致するか確かめる</li>
+<li><strong>4-2</strong> <code>exchange_code_for_token()</code>: 認可コードをトークンエンドポイントに送ってトークンと交換する</li>
+</ul>
+<h4>考え方: state の役割</h4>
+<p><code>/callback</code> は誰でもアクセスできる URL です。つまり <strong>自分が始めていない認可フローの結果</strong> が届く可能性があります。state は「このコールバックは、このブラウザで、自分が始めたフローの続きだ」と確かめるための合言葉です。具体的な攻撃シナリオは<a href="#csrf">10.1</a> で扱います。</p>
+<p>比較に <code>==</code> ではなく <code>secrets.compare_digest()</code> を使うのは、文字列比較にかかる時間の差から秘密の値を推測される <strong>タイミング攻撃</strong> を防ぐためです。秘密の値を比較するときの定石として覚えておきましょう。</p>
+<h4>考え方: トークンリクエスト</h4>
+<p>トークンリクエストは <strong>バックチャネル</strong>（クライアントのサーバーから認可サーバーへの直接通信）です。用意済みの <code>post_to_token_endpoint()</code> が、クライアント認証（Basic 認証ヘッダー）とエラー処理を担当するので、あなたは送るパラメータを組み立てるだけです。</p>
+<p><code>redirect_uri</code> を再度送るのは、認可サーバーが「認可リクエストのときと同じ <code>redirect_uri</code> か」を照合するためです（演習 5-2）。</p>
+<h4>確認</h4>
+<pre><code class="language-bash">uv run pytest -k step4</code></pre>
+<details>
+<summary>解答例</summary>
+<pre><code class="language-python"># 4-1
+if expected is None or received is None:
+    return False
+return secrets.compare_digest(expected.encode(), received.encode())
+
+# 4-2
+form = {
+    "grant_type": "authorization_code",
+    "code": code,
+    "redirect_uri": settings.redirect_uri,
+}
+if code_verifier is not None:
+    form["code_verifier"] = code_verifier
+return post_to_token_endpoint(settings, form)</code></pre>
+</details>
+</section>
+
+<!-- ---------------------------------------------------------------- -->
+<section class="exercise" id="ex5">
+<h3>演習 5: トークンエンドポイント <span class="role-auth">［認可サーバー］</span></h3>
+<h4>やること</h4>
+<ul>
+<li><strong>5-1</strong> <code>authenticate_client()</code>: Basic 認証ヘッダーから <code>client_id</code> と <code>client_secret</code> を取り出し、登録情報と照合する</li>
+<li><strong>5-2</strong> <code>redeem_authorization_code()</code>: 認可コードを検証し、使用済みにする</li>
+<li><strong>5-3</strong> <code>issue_tokens()</code>: アクセストークンとリフレッシュトークンを発行する</li>
+</ul>
+<p>OAuth の中で最もセキュリティ上のチェックが集中する場所です。</p>
+
+<h4>考え方: 認可コードのチェックリスト</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>チェック</th><th>防いでいること</th><th>エラー</th></tr></thead>
+<tbody>
+<tr><td>コードが存在する</td><td>でたらめなコード</td><td><code>invalid_grant</code></td></tr>
+<tr><td>未使用である</td><td>漏れたコードの再利用。再利用を検知したら、そのコードから発行済みのトークンも失効させる（<code>self.revoke_grant()</code>）</td><td><code>invalid_grant</code></td></tr>
+<tr><td>期限内である</td><td>古いコードの悪用</td><td><code>invalid_grant</code></td></tr>
+<tr><td>同じクライアント宛てである</td><td>別のアプリが他人宛てのコードを使う</td><td><code>invalid_grant</code></td></tr>
+<tr><td><code>redirect_uri</code> が一致する</td><td>コードの送り先をすり替える攻撃</td><td><code>invalid_grant</code></td></tr>
+<tr><td>PKCE の <code>code_verifier</code> が正しい（challenge がある場合）</td><td>コードを横取りした第三者による交換（演習 7）</td><td><code>invalid_grant</code></td></tr>
+</tbody>
+</table></div>
+<aside class="note">
+<span class="label">ℹ PKCE の部分について</span>
+<p>PKCE の検証関数 <code>pkce.verify_pkce()</code> の中身は演習 7 で作ります。ここでは「<code>record.code_challenge</code> が <code>None</code> でなければ <code>pkce.verify_pkce(...)</code> を呼ぶ」という 1 行を書くだけで構いません。<code>--no-pkce</code> で動かしている間は <code>code_challenge</code> が常に <code>None</code> なので、未実装でも問題なく動きます。</p>
+</aside>
+
+<h4>考え方: トークンレスポンス</h4>
+<p>トークンエンドポイントが返す JSON の形式は RFC 6749 5.1 で決まっています。<code>access_token</code>、<code>token_type</code>（<code>"Bearer"</code>）、<code>expires_in</code>（秒数）、必要に応じて <code>refresh_token</code> と <code>scope</code> を返します。<code>Cache-Control: no-store</code> ヘッダーを付けるのも仕様の要求で、これは用意済みの <code>json_response()</code> が自動で付けます。</p>
+
+<h4>確認</h4>
+<pre><code class="language-bash">uv run pytest -k step5</code></pre>
+<details>
+<summary>解答例</summary>
+<pre><code class="language-python"># 5-1
+credentials = decode_basic_auth(request.header("Authorization"))
+if credentials is None:
+    raise OAuthError("invalid_client", "クライアント認証情報がありません", status=401)
+client_id, client_secret = credentials
+client = self.clients.get(client_id)
+if client is None or not secrets.compare_digest(client.client_secret.encode(), client_secret.encode()):
+    raise OAuthError("invalid_client", "クライアント認証に失敗しました", status=401)
+return client
+
+# 5-2
+code = form.get("code")
+if not code:
+    raise OAuthError("invalid_request", "code がありません")
+with self.lock:
+    record = self.codes.get(code)
+    if record is None:
+        raise OAuthError("invalid_grant", "認可コードが存在しません")
+    if record.used:
+        self.revoke_grant(record.code)
+        raise OAuthError("invalid_grant", "この認可コードは使用済みです")
+    if time.time() &gt;= record.expires_at:
+        raise OAuthError("invalid_grant", "認可コードの有効期限が切れています")
+    if record.client_id != client.client_id:
+        raise OAuthError("invalid_grant", "別のクライアントに発行された認可コードです")
+    if form.get("redirect_uri") != record.redirect_uri:
+        raise OAuthError("invalid_grant", "redirect_uri が認可リクエスト時と一致しません")
+    if record.code_challenge is not None and not pkce.verify_pkce(
+        form.get("code_verifier"), record.code_challenge
+    ):
+        raise OAuthError("invalid_grant", "code_verifier が正しくありません (PKCE)")
+    record.used = True
+    return record
+
+# 5-3
+now = time.time()
+access_token = secrets.token_urlsafe(32)
+refresh_token = secrets.token_urlsafe(32)
+with self.lock:
+    self.access_tokens[access_token] = AccessTokenRecord(
+        token=access_token, client_id=client_id, username=username, scope=scope,
+        expires_at=now + config.ACCESS_TOKEN_TTL_SECONDS, grant_id=grant_id,
+    )
+    self.refresh_tokens[refresh_token] = RefreshTokenRecord(
+        token=refresh_token, client_id=client_id, username=username, scope=scope,
+        expires_at=now + config.REFRESH_TOKEN_TTL_SECONDS, grant_id=grant_id,
+    )
+return {
+    "access_token": access_token,
+    "token_type": "Bearer",
+    "expires_in": config.ACCESS_TOKEN_TTL_SECONDS,
+    "refresh_token": refresh_token,
+    "scope": scope,
+}</code></pre>
+<p>5-2 で「存在確認 → 使用済み確認 → … → 使用済みにする」をすべて同じロックの中で行っているのは、同じコードで同時に 2 つのリクエストが来たときに、両方とも「未使用」と判定されてしまう競合（レースコンディション）を防ぐためです。</p>
+</details>
+</section>
+
+<!-- ---------------------------------------------------------------- -->
+<section class="exercise" id="ex6">
+<h3>演習 6: アクセストークンで API を守る ［3 者すべて］</h3>
+<h4>やること</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>番号</th><th>担当</th><th>関数</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td>6-1</td><td class="role-auth">認可サーバー</td><td><code>AuthorizationServer.introspect()</code></td><td>トークンが有効なら情報を、無効なら <code>{"active": false}</code> を返す</td></tr>
+<tr><td>6-2</td><td class="role-resource">リソースサーバー</td><td><code>extract_bearer_token()</code></td><td><code>Authorization: Bearer xxx</code> からトークンを取り出す</td></tr>
+<tr><td>6-3</td><td class="role-resource">リソースサーバー</td><td><code>introspect_token()</code></td><td>認可サーバーに有効性を問い合わせる</td></tr>
+<tr><td>6-4</td><td class="role-resource">リソースサーバー</td><td><code>has_scope()</code></td><td>必要なスコープを持っているか確かめる</td></tr>
+<tr><td>6-5</td><td class="role-client">クライアント</td><td><code>call_resource_api()</code></td><td>トークンを付けて API を呼ぶ</td></tr>
+</tbody>
+</table></div>
+
+<h4>考え方: リソースサーバーの判定順序</h4>
+<p>用意済みの <code>ResourceServer._protected()</code> は、次の順で判定します（RFC 6750）。</p>
+<div class="table-wrap"><table>
+<thead><tr><th>状況</th><th>レスポンス</th></tr></thead>
+<tbody>
+<tr><td>トークンが付いていない</td><td><code>401</code> + <code>WWW-Authenticate: Bearer realm="..."</code></td></tr>
+<tr><td>トークンが無効・期限切れ・取り消し済み</td><td><code>401</code> + <code>WWW-Authenticate: Bearer error="invalid_token"</code></td></tr>
+<tr><td>トークンは有効だがスコープが足りない</td><td><code>403</code> + <code>WWW-Authenticate: Bearer error="insufficient_scope"</code></td></tr>
+<tr><td>すべて OK</td><td><code>200</code> + トークンの持ち主のデータ</td></tr>
+</tbody>
+</table></div>
+<p><code>401 Unauthorized</code> は「誰だか分からない（認証情報が無い・無効）」、<code>403 Forbidden</code> は「誰だかは分かったが権限が無い」という使い分けです。</p>
+
+<h4>考え方: イントロスペクションの注意点</h4>
+<ul>
+<li>無効なトークンについては、理由（存在しない・期限切れ・失効など）を返さず <code>{"active": false}</code> だけを返します。攻撃者に余計なヒントを与えないためです。</li>
+<li>イントロスペクションエンドポイント自体も保護が必要です。誰でも呼べると、盗んだトークンが有効かどうかを試し放題になってしまいます。この教材ではリソースサーバーも Basic 認証で自分を証明します（6-3）。</li>
+<li>リフレッシュトークンを API に使えてはいけません。<code>self.access_tokens</code> だけを探すようにします。</li>
+</ul>
+
+<h4>確認</h4>
+<pre><code class="language-bash">uv run pytest -k step6
+uv run pytest -k without_pkce      # 演習 1〜6 が揃うとここが通る
+uv run oauth-sample exercise --no-pkce   # ブラウザで一通り動かしてみる</code></pre>
+<aside class="success">
+<span class="label">✔ ここまで来たら</span>
+<p>おめでとうございます。認可コードフローの基本形が完成しました。ブラウザで<a href="#run">8.3 の観察ツアー</a>を自分の実装で再現してみてください。</p>
+</aside>
+<details>
+<summary>解答例</summary>
+<pre><code class="language-python"># 6-1 (auth_server.py)
+with self.lock:
+    record = self.access_tokens.get(token)
+if record is None or record.revoked or time.time() &gt;= record.expires_at:
+    return {"active": False}
+return {
+    "active": True,
+    "scope": record.scope,
+    "client_id": record.client_id,
+    "username": record.username,
+    "token_type": "Bearer",
+    "exp": int(record.expires_at),
+}
+
+# 6-2 (resource_server.py)
+if authorization is None:
+    return None
+scheme, _, token = authorization.partition(" ")
+token = token.strip()
+if scheme.lower() != "bearer" or not token:
+    return None
+return token
+
+# 6-3 (resource_server.py)
+result = http_request(
+    "resource", "POST", settings.introspection_endpoint,
+    form={"token": token},
+    headers={"Authorization": encode_basic_auth(config.RESOURCE_SERVER_ID, config.RESOURCE_SERVER_SECRET)},
+)
+if result.status != 200:
+    raise RuntimeError(f"イントロスペクションに失敗しました: {result.status} {result.body}")
+return result.body
+
+# 6-4 (resource_server.py)
+scope = token_info.get("scope")
+if not isinstance(scope, str):
+    return False
+return required_scope in scope.split()
+
+# 6-5 (client.py)
+return http_request(
+    "client", "GET", settings.resource_base_url + path,
+    headers={"Authorization": f"Bearer {access_token}"},
+)</code></pre>
+</details>
+</section>
+
+<!-- ---------------------------------------------------------------- -->
+<section class="exercise" id="ex7">
+<h3>演習 7: PKCE ［クライアント・認可サーバー］</h3>
+<h4>PKCE とは</h4>
+<p><strong>PKCE</strong>（Proof Key for Code Exchange、「ピクシー」と読みます。RFC 7636）は、<strong>認可コードを盗まれても、盗んだ人がトークンと交換できないようにする</strong> 仕組みです。もともとは秘密を持てないスマホアプリ（パブリッククライアント）のために作られましたが、現在はコンフィデンシャルクライアントも含めて <strong>すべてのクライアントで使うことが推奨</strong> されています（RFC 9700、OAuth 2.1）。</p>
+
+<figure>
+<pre class="mermaid">
+sequenceDiagram
+  participant C as クライアント
+  participant B as ブラウザ
+  participant A as 認可サーバー
+  Note over C: code_verifier = ランダムな合言葉 (秘密)<br/>code_challenge = SHA256(code_verifier)
+  C->>B: 302 /authorize?...&code_challenge=E9Mel...&code_challenge_method=S256
+  B->>A: 認可リクエスト (ハッシュ値だけが通る)
+  Note over A: code_challenge を認可コードと一緒に保存
+  A->>B: 302 /callback?code=...
+  B->>C: code
+  C->>A: POST /token code=... &code_verifier=dBjft... (合言葉そのもの)
+  Note over A: SHA256(code_verifier) == 保存した code_challenge ?
+  A-->>C: 一致したらトークンを発行
+</pre>
+<figcaption>図 9-1: PKCE の流れ。フロントチャネルには「ハッシュ値」だけが流れ、「合言葉そのもの」はバックチャネルで初めて送られる。</figcaption>
+</figure>
+
+<p>ポイントは <strong>ハッシュ関数（SHA-256）の一方向性</strong> です。ハッシュ値から元の値を逆算することは事実上できません。フロントチャネルを盗み見た攻撃者は <code>code_challenge</code>（ハッシュ値）と <code>code</code> は手に入れられても、<code>code_verifier</code>（合言葉）は分からないので、トークンリクエストに成功しません。</p>
+<p>また、<code>code_verifier</code> はフローごとに新しく作ってクライアントのセッションに保存するので、「このトークンリクエストは、あの認可リクエストを出したのと同じクライアントのセッションから来た」ことの証明にもなります。これにより、盗んだ認可コードを <strong>別のセッションに注入する攻撃</strong>（認可コードインジェクション）も防げます。</p>
+
+<h4>やること</h4>
+<ul>
+<li><strong>7-1</strong> <code>pkce.generate_code_verifier()</code>: 43〜128 文字のランダムな合言葉を作る</li>
+<li><strong>7-2</strong> <code>pkce.compute_code_challenge()</code>: <code>BASE64URL(SHA256(code_verifier))</code>（パディングの <code>=</code> なし）を計算する</li>
+<li><strong>7-3</strong> <code>pkce.verify_pkce()</code>: 認可サーバー側で、<code>code_verifier</code> と保存しておいた <code>code_challenge</code> を照合する</li>
+<li><strong>7-4</strong> <code>auth_server.extract_pkce_challenge()</code>: 認可リクエストから <code>code_challenge</code> を取り出して検証する（<code>S256</code> のみ受け付ける）</li>
+</ul>
+<p>クライアント側で <code>code_verifier</code> を作ってセッションに保存し、<code>code_challenge</code> を認可リクエストに付ける処理は、用意済みの <code>ClientApp._login()</code> がすでに行っています。演習 1 と 4 で <code>code_challenge</code> / <code>code_verifier</code> 引数を扱っておいたのはこのためです。</p>
+
+<aside class="note">
+<span class="label">ℹ Base64URL とは</span>
+<p>通常の Base64 は <code>+</code> <code>/</code> <code>=</code> を使いますが、これらは URL の中で特別な意味を持ちます。<strong>Base64URL</strong> は <code>+</code> を <code>-</code>、<code>/</code> を <code>_</code> に置き換え、末尾の <code>=</code> を取り除いた、URL に安全な変種です。Python では <code>base64.urlsafe_b64encode()</code> の結果から <code>=</code> を <code>rstrip</code> します。</p>
+</aside>
+
+<h4>確認</h4>
+<pre><code class="language-bash">uv run pytest -k step7
+uv run pytest -k with_pkce
+uv run oauth-sample exercise        # --no-pkce を外して起動</code></pre>
+<p>テストには RFC 7636 の付録に載っている計算例（<code>dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk</code> → <code>E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM</code>）がそのまま使われています。仕様書の例と一致すれば、他の実装とも相互運用できるということです。</p>
+<details>
+<summary>解答例</summary>
+<pre><code class="language-python"># 7-1
+return secrets.token_urlsafe(32)   # 32 バイト → 43 文字
+
+# 7-2
+digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
+return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+
+# 7-3
+if code_verifier is None or CODE_VERIFIER_PATTERN.fullmatch(code_verifier) is None:
+    return False
+expected = compute_code_challenge(code_verifier)
+return secrets.compare_digest(expected.encode("ascii"), code_challenge.encode("ascii"))
+
+# 7-4
+challenge = query.get("code_challenge")
+if challenge is None:
+    raise OAuthError("invalid_request", "code_challenge が必要です (PKCE)")
+if query.get("code_challenge_method", "plain") != "S256":
+    raise OAuthError("invalid_request", "code_challenge_method は S256 のみ対応しています")
+if CODE_CHALLENGE_PATTERN.fullmatch(challenge) is None:
+    raise OAuthError("invalid_request", "code_challenge の形式が不正です")
+return challenge</code></pre>
+<p>PKCE には <code>plain</code>（ハッシュせずにそのまま送る）方式もありますが、それでは盗み見られた時点で合言葉がばれてしまうため、この教材では受け付けません。</p>
+</details>
+</section>
+
+<!-- ---------------------------------------------------------------- -->
+<section class="exercise" id="ex8">
+<h3>演習 8: リフレッシュトークン ［クライアント・認可サーバー］</h3>
+<h4>やること</h4>
+<ul>
+<li><strong>8-1</strong> <code>AuthorizationServer.exchange_refresh_token()</code>: リフレッシュトークンを検証し、新しいトークン一式を発行する（ローテーション付き）</li>
+<li><strong>8-2</strong> <code>client.refresh_access_token()</code>: <code>grant_type=refresh_token</code> でトークンエンドポイントを呼ぶ</li>
+</ul>
+<h4>考え方: リフレッシュトークンローテーション</h4>
+<p>リフレッシュトークンは長命なので、盗まれたときの被害が大きくなります。そこで <strong>使うたびに新しいリフレッシュトークンを発行し、古いものは無効にする</strong> のがローテーションです。</p>
+<p>さらに、<strong>すでに使われた（無効化された）古いリフレッシュトークンが再び送られてきたら</strong>、それは「正規のクライアントと攻撃者のどちらかが、盗まれたトークンを使っている」ことを意味します。認可サーバーにはどちらが正規か分からないので、<strong>その許可（grant）から発行したトークンをすべて失効させます</strong>。正規のユーザーはもう一度同意し直す必要がありますが、攻撃者も締め出せます。</p>
+<p>この教材では、最初の認可コードの値を <code>grant_id</code> として各トークンに記録し、<code>revoke_grant(grant_id)</code> で一括失効できるようにしています。</p>
+<h4>確認</h4>
+<pre><code class="language-bash">uv run pytest -k step8
+uv run pytest                       # すべて通れば完走です</code></pre>
+<details>
+<summary>解答例</summary>
+<pre><code class="language-python"># 8-1
+token = form.get("refresh_token")
+if not token:
+    raise OAuthError("invalid_request", "refresh_token がありません")
+with self.lock:
+    record = self.refresh_tokens.get(token)
+    if record is None or record.client_id != client.client_id:
+        raise OAuthError("invalid_grant", "リフレッシュトークンが不正です")
+    if record.revoked:
+        self.revoke_grant(record.grant_id)
+        raise OAuthError("invalid_grant", "このリフレッシュトークンは使用済みです")
+    if time.time() &gt;= record.expires_at:
+        raise OAuthError("invalid_grant", "リフレッシュトークンの有効期限が切れています")
+    record.revoked = True
+    return self.issue_tokens(record.username, record.client_id, record.scope, record.grant_id)
+
+# 8-2
+return post_to_token_endpoint(
+    settings, {"grant_type": "refresh_token", "refresh_token": refresh_token}
+)</code></pre>
+</details>
+<aside class="success">
+<span class="label">✔ 完走おめでとうございます</span>
+<p><code>uv run pytest</code> がすべて通れば、認可コードフロー + PKCE + リフレッシュトークンローテーションを備えた、3 者そろった OAuth 2.0 の実装が完成です。次の章で、実際に攻撃を試して対策の効果を確かめましょう。</p>
+</aside>
+</section>
+</section>
+
+<!-- ================================================================== -->
+<section id="security">
+<h2>10. 攻撃と対策を体験する</h2>
+<p>セキュリティ対策は「なぜ必要か」が実感しにくいものです。ここでは完成した実装（自分のものでも <code>solution</code> でも構いません）を使って、実際に攻撃を試してみます。</p>
+
+<h3 id="csrf">10.1 state が無いと何が起きるか（CSRF / ログイン CSRF）</h3>
+<p><strong>CSRF（Cross-Site Request Forgery）</strong> は、被害者のブラウザに、本人の意図しないリクエストを送らせる攻撃です。OAuth のコールバックに対する CSRF は次のように進みます。</p>
+<figure>
+<pre class="mermaid">
+sequenceDiagram
+  actor E as 攻撃者
+  actor V as 被害者 (ブラウザ)
+  participant C as クライアント
+  participant A as 認可サーバー
+  E->>A: 攻撃者自身のアカウントで認可フローを進める
+  A-->>E: 302 /callback?code=攻撃者のコード
+  Note over E: ここで止めて、コールバック URL を控える
+  E->>V: 罠サイトや画像タグで<br/>/callback?code=攻撃者のコード を開かせる
+  V->>C: GET /callback?code=攻撃者のコード
+  C->>A: コードをトークンと交換
+  Note over C,V: 被害者のセッションが<br/>「攻撃者のアカウント」と連携されてしまう
+  V->>C: 被害者が自分のメモを保存・同期する
+  Note over E: 被害者のデータが攻撃者のアカウントに保存される
+</pre>
+<figcaption>図 10-1: state が無い場合の CSRF 攻撃</figcaption>
+</figure>
+<p>state があれば、被害者のブラウザのセッションには攻撃者のフローの state が保存されていないので、⑤の時点で「state が一致しません」と拒否できます。</p>
+<h4>試してみよう</h4>
+<ol class="steps">
+<li>クライアントで「連携する」→ ログイン → 同意 と進め、トークン取得後のトップページを表示します。</li>
+<li>ターミナルのログから <code>[クライアント] ← GET /callback</code> の直前にある <code>Location: http://127.0.0.1:8000/callback?code=...&amp;state=...</code> をコピーします。</li>
+<li><code>state=</code> の値を書き換えた URL をブラウザで開きます。→「state が一致しません」と表示されるはずです。</li>
+<li>書き換えずにそのまま開いても拒否されます。state は使い捨てで、1 回目のコールバックで消去済みだからです。</li>
+</ol>
+
+<h3>10.2 認可コードの再利用</h3>
+<ol class="steps">
+<li>10.1 と同じようにコールバック URL の <code>code</code> を控えます。</li>
+<li>次のコマンドで、同じコードをもう一度トークンと交換してみます（<code>&lt;CODE&gt;</code> を置き換え。PowerShell では <code>curl.exe</code> と書き、行末の <code>\</code> を取り除いて 1 行で実行します）。
+<pre><code class="language-bash">curl -i -X POST http://127.0.0.1:9000/token \
+  -u demo-client:demo-client-secret \
+  -d grant_type=authorization_code -d code=&lt;CODE&gt; \
+  -d redirect_uri=http://127.0.0.1:8000/callback</code></pre>
+→ <code>{"error": "invalid_grant", "error_description": "この認可コードは使用済みです"}</code> が返ります。</li>
+<li>クライアントで「プロフィールを取得」を押すと 401 になります。コードの再利用を検知した認可サーバーが、そのコードから発行したトークンを失効させたためです。認可サーバーのダッシュボードでも「失効」になっているのを確認しましょう。</li>
+</ol>
+
+<h3>10.3 redirect_uri の改ざん</h3>
+<p>認可サーバーに次の URL で直接アクセスしてみてください（<code>redirect_uri</code> が攻撃者のサイトになっています）。</p>
+<pre><code class="language-text">http://127.0.0.1:9000/authorize?response_type=code&amp;client_id=demo-client&amp;redirect_uri=https%3A%2F%2Fevil.example%2Fcallback&amp;scope=profile&amp;state=x</code></pre>
+<p>→ リダイレクトされず、認可サーバーの画面で「redirect_uri が登録されている値と一致しません」と表示されます。もし認可サーバーがここで <code>evil.example</code> に認可コードを送ってしまったら、攻撃者はユーザーのデータにアクセスできてしまいます。</p>
+<p>比較として、上の URL の <code>redirect_uri</code> を正しい値（<code>http%3A%2F%2F127.0.0.1%3A8000%2Fcallback</code>）に戻し、代わりに <code>scope=admin</code> と不正なスコープにしてみてください。今度はクライアントのコールバックへリダイレクトされ、アドレスバーの URL に <code>error=invalid_scope</code> が付いていることが確認できます。<code>redirect_uri</code> が正しいと確認できたので、エラーをクライアントに返してよいわけです（クライアントの画面には「state が一致しません」と表示されますが、これはクライアントを経由せずに直接 URL を開いたためで、正しい挙動です）。</p>
+
+<h3>10.4 PKCE が無いと何が起きるか（認可コードの横取り）</h3>
+<p>認可コードはフロントチャネルを通るため、次のような経路で漏れる可能性があります。</p>
+<ul>
+<li>スマホで、悪意のあるアプリが正規アプリと同じカスタム URL スキーム（<code>myapp://callback</code>）を登録してコールバックを横取りする</li>
+<li>ブラウザ履歴、プロキシやサーバーのアクセスログ、Referer ヘッダー、悪意あるブラウザ拡張</li>
+</ul>
+<p>パブリッククライアントには <code>client_secret</code> が無いので、コードさえ手に入れば誰でもトークンと交換できてしまいます。PKCE があれば、交換には <code>code_verifier</code> が必要なので失敗します。</p>
+<h4>試してみよう</h4>
+<p>攻撃者が認可コードだけを盗み見た状況を再現します。</p>
+<ol class="steps">
+<li>PKCE 有効（<code>--no-pkce</code> なし）で起動し、ブラウザで次の URL を直接開きます。RFC 7636 の例の <code>code_challenge</code> を付けた認可リクエストです。
+<pre><code class="language-text">http://127.0.0.1:9000/authorize?response_type=code&amp;client_id=demo-client&amp;redirect_uri=http%3A%2F%2F127.0.0.1%3A8000%2Fcallback&amp;scope=profile&amp;state=demo&amp;code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&amp;code_challenge_method=S256</code></pre></li>
+<li>ログインして「許可する」を押すと、クライアントのコールバックに戻りますが、クライアントは「state が一致しません」と拒否します（クライアント自身が始めたフローではないため）。このおかげで <strong>認可コードは未使用のまま</strong> 残ります。アドレスバーの URL から <code>code</code> の値を控えてください。</li>
+<li>攻撃者になったつもりで、<code>code_verifier</code> を知らないままトークンと交換してみます（<code>&lt;CODE&gt;</code> を置き換え）。
+<pre><code class="language-bash">curl -i -X POST http://127.0.0.1:9000/token   -u demo-client:demo-client-secret   -d grant_type=authorization_code -d code=&lt;CODE&gt;   -d redirect_uri=http://127.0.0.1:8000/callback</code></pre>
+→ <code>{"error": "invalid_grant", "error_description": "code_verifier が正しくありません (PKCE)"}</code> で拒否されます。</li>
+<li>今度は正しい合言葉を付けてみます。末尾に <code>-d code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk</code> を足して実行すると、トークンが発行されます。<strong>合言葉を知っている者だけが交換できる</strong> ことが確認できました。</li>
+</ol>
+<p class="muted">PowerShell では <code>curl</code> の代わりに <code>curl.exe</code> と書き、行末の <code>\</code> を取り除いて 1 行で実行してください。</p>
+<aside class="note">
+<span class="label">ℹ もう一歩: 自分で穴を開けてみる</span>
+<p>演習版のコードで、<code>redeem_authorization_code()</code> の <code>used</code> チェックや <code>redirect_uri</code> の照合をわざとコメントアウトし、<code>uv run pytest</code> を実行してみてください。どのテストが落ちるかを見ると、各チェックが何を守っているのかがよく分かります（確認が終わったら元に戻してください）。</p>
+</aside>
+
+<h3>10.5 対策のまとめ</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>対策</th><th>防ぐ攻撃</th><th>実装した演習</th></tr></thead>
+<tbody>
+<tr><td><code>state</code> の生成と検証</td><td>コールバックへの CSRF</td><td>1, 4-1</td></tr>
+<tr><td><code>redirect_uri</code> の完全一致検証、不正時はリダイレクトしない</td><td>認可コードの流出、オープンリダイレクタ</td><td>2-1, 5-2</td></tr>
+<tr><td>認可コードは推測不能・短命・使い捨て</td><td>コードの推測、漏れたコードの再利用</td><td>3-1, 5-2</td></tr>
+<tr><td>クライアント認証（client_secret）</td><td>第三者によるコードの交換</td><td>5-1</td></tr>
+<tr><td>PKCE（S256）</td><td>コードの横取り・注入</td><td>7</td></tr>
+<tr><td>トークンは短命、スコープを最小に</td><td>トークン漏洩時の被害拡大</td><td>5-3, 6-4</td></tr>
+<tr><td>リフレッシュトークンのローテーションと再利用検知</td><td>リフレッシュトークンの盗用</td><td>8-1</td></tr>
+<tr><td>秘密の比較に <code>compare_digest</code></td><td>タイミング攻撃</td><td>4-1, 5-1, 7-3</td></tr>
+</tbody>
+</table></div>
+</section>
+
+<!-- ================================================================== -->
+<section id="oidc">
+<h2>11. OAuth と OpenID Connect</h2>
+<p>この教材のクライアントは、<code>/api/profile</code> を呼んで「alice さんのデータだ」と表示しています。これを見ると「OAuth でログイン機能が作れる」と思うかもしれません。しかし、<strong>アクセストークンは「このトークンを持つ人に、このデータへのアクセスを許可する」という証明であって、「いまアクセスしているのが alice 本人だ」という証明ではありません</strong>。</p>
+
+<h3>11.1 素の OAuth を認証に使う危険</h3>
+<p>例えば、悪意のあるアプリ X が、自分のユーザーから集めたアクセストークンを持っていたとします。もし別のアプリ Y が「受け取ったアクセストークンで <code>/api/profile</code> を呼べて、alice と返ってきたら、alice としてログインさせる」という作りだったら、X の運営者は alice のトークンを Y に渡すだけで、Y に alice としてログインできてしまいます。アクセストークンには「どのアプリ宛てに発行されたか」が含まれているとは限らないためです（<strong>トークン置き換え攻撃</strong>）。</p>
+
+<h3>11.2 OpenID Connect（OIDC）</h3>
+<p><strong>OpenID Connect</strong> は、OAuth 2.0 の上に「認証」のための仕組みを足した仕様です。認可コードフローの <code>scope</code> に <code>openid</code> を含めると、トークンレスポンスに <strong>ID トークン</strong> が追加されます。</p>
+<div class="table-wrap"><table>
+<thead><tr><th></th><th>アクセストークン（OAuth）</th><th>ID トークン（OIDC）</th></tr></thead>
+<tbody>
+<tr><th>目的</th><td>API にアクセスするための鍵（認可）</td><td>ユーザーが誰で、いつどう認証されたかの証明書（認証）</td></tr>
+<tr><th>宛先</th><td>リソースサーバー</td><td>クライアント自身</td></tr>
+<tr><th>形式</th><td>決まっていない（不透明 / JWT）</td><td>必ず署名付き JWT</td></tr>
+<tr><th>主な中身</th><td>スコープ、期限など</td><td><code>iss</code>（発行者）、<code>sub</code>（ユーザー ID）、<code>aud</code>（宛先クライアント）、<code>exp</code>、<code>nonce</code> など</td></tr>
+</tbody>
+</table></div>
+<p>ID トークンには <code>aud</code>（このトークンはどのクライアント宛てか）が必ず含まれ、クライアントは署名と <code>aud</code> を検証します。これにより 11.1 の攻撃を防げます。「Google でログイン」などの実際のソーシャルログインは、ほぼすべて OpenID Connect です。</p>
+<aside class="note">
+<span class="label">ℹ 次の学習ステップ</span>
+<p>この教材の認可サーバーに ID トークンの発行（JWT の生成と署名）を追加し、クライアント側で検証してみると、OpenID Connect の理解が深まります。</p>
+</aside>
+</section>
+
+<!-- ================================================================== -->
+<section id="grants">
+<h2>12. 他のフローと OAuth 2.1</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>フロー（grant type）</th><th>用途</th><th>現在の扱い</th></tr></thead>
+<tbody>
+<tr><td><strong>認可コード + PKCE</strong></td><td>ユーザーが関わるほぼすべての場面（Web、スマホ、SPA）</td><td><ins>推奨</ins>（この教材）</td></tr>
+<tr><td>リフレッシュトークン</td><td>アクセストークンの更新</td><td><ins>推奨</ins>（この教材）</td></tr>
+<tr><td>クライアントクレデンシャル</td><td>ユーザーが関わらない、サーバー同士のバッチ処理など。クライアント自身の権限で動く</td><td><ins>推奨</ins></td></tr>
+<tr><td>デバイス認可（RFC 8628）</td><td>テレビや CLI など、ブラウザ入力が難しい機器。「別の端末で <code>example.com/device</code> を開いてコードを入力」</td><td><ins>推奨</ins></td></tr>
+<tr><td>インプリシット</td><td>かつての SPA 向け。トークンを直接フロントチャネルで返す</td><td><del>非推奨</del>（トークン漏洩リスク）</td></tr>
+<tr><td>リソースオーナーパスワードクレデンシャル</td><td>ユーザーのパスワードをクライアントが直接受け取る</td><td><del>非推奨</del>（OAuth の目的に反する）</td></tr>
+</tbody>
+</table></div>
+<p><strong>OAuth 2.1</strong> は、2012 年の OAuth 2.0（RFC 6749）以降に積み重なったベストプラクティスを 1 つにまとめ直す仕様です。主な変更点は、PKCE の必須化、インプリシットとパスワードフローの削除、<code>redirect_uri</code> の完全一致の必須化、Bearer トークンをクエリに載せることの禁止などで、この教材の実装はこれらに沿っています。</p>
+</section>
+
+<!-- ================================================================== -->
+<section id="production">
+<h2>13. 本番で使うときの注意</h2>
+<aside class="warning">
+<span class="label">⚠ 自作は学習のためだけに</span>
+<p>この教材の目的は仕組みの理解です。実際のサービスでは、認可サーバーを自作せず、実績のある製品・サービス（Keycloak、Auth0、Amazon Cognito、Microsoft Entra ID など）を使ってください。クライアント側も、Python なら <a href="https://docs.authlib.org/">Authlib</a> などのライブラリを使うのが安全です。ただし、ライブラリを正しく設定・利用するためにも、この教材で学んだ知識は必ず役に立ちます。</p>
+</aside>
+
+<h3>この教材で簡略化していること</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>項目</th><th>この教材</th><th>本番では</th></tr></thead>
+<tbody>
+<tr><td>通信</td><td>HTTP（平文）</td><td><strong>必ず HTTPS</strong>（ループバックのネイティブアプリ等の例外を除く）</td></tr>
+<tr><td>データの保存</td><td>メモリ上（再起動で消える）</td><td>データベース。トークンはハッシュ化して保存することも多い</td></tr>
+<tr><td>ユーザーのパスワード</td><td>平文で設定ファイルに記載</td><td>bcrypt / Argon2 などでハッシュ化。多要素認証も検討</td></tr>
+<tr><td>client_secret</td><td>ソースコードに記載</td><td>環境変数やシークレットマネージャーで管理。より強い認証方式（<code>private_key_jwt</code>、mTLS）も検討</td></tr>
+<tr><td>トークンの表示・ログ</td><td>学習のため画面とログに表示</td><td><strong>絶対に表示・記録しない</strong></td></tr>
+<tr><td>同意の記憶</td><td>毎回同意画面を表示</td><td>一度同意したスコープは記憶し、追加分だけ確認するのが一般的</td></tr>
+<tr><td>認可サーバーのフォーム保護</td><td>セッションに紐づく <code>request_id</code> と <code>SameSite</code> Cookie のみ</td><td>CSRF トークン、クリックジャッキング対策（<code>X-Frame-Options</code> / CSP）、ログイン試行回数の制限</td></tr>
+<tr><td>トークンの宛先制限</td><td>なし</td><td>複数のリソースサーバーがある場合は <code>aud</code>（audience）でトークンの宛先を限定する</td></tr>
+<tr><td>メタデータ</td><td>エンドポイント URL を設定ファイルに直接記載</td><td><code>/.well-known/oauth-authorization-server</code>（RFC 8414）や OIDC Discovery で自動取得</td></tr>
+</tbody>
+</table></div>
+
+<h3>クライアント実装のチェックリスト</h3>
+<ul>
+<li>認可コードフロー + PKCE（S256）を使っている</li>
+<li>state（または OIDC の nonce）を毎回生成し、検証している</li>
+<li>要求するスコープは最小限</li>
+<li>アクセストークン・リフレッシュトークンはサーバー側に保存し、ブラウザの <code>localStorage</code> などには置かない（SPA の場合は BFF パターンも検討）</li>
+<li>ログインが目的なら OAuth ではなく OpenID Connect の ID トークンを検証している</li>
+</ul>
+</section>
+
+<!-- ================================================================== -->
+<section id="glossary">
+<h2>14. 用語集</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>用語</th><th>意味</th></tr></thead>
+<tbody>
+<tr><td>アクセストークン</td><td>API にアクセスするための、期限とスコープ付きの鍵。持っている人が使える（Bearer）。</td></tr>
+<tr><td>イントロスペクション</td><td>リソースサーバーが認可サーバーに「このトークンは有効か」を問い合わせる仕組み（RFC 7662）。</td></tr>
+<tr><td>オープンリダイレクタ</td><td>任意の URL へリダイレクトさせられてしまう脆弱性。フィッシングなどの踏み台になる。</td></tr>
+<tr><td>クライアント</td><td>ユーザーのデータを使いたい第三者アプリ。ブラウザのことではない。</td></tr>
+<tr><td>クライアント認証</td><td>クライアントが <code>client_secret</code> などで自分が本物であることを認可サーバーに証明すること。</td></tr>
+<tr><td>グラント（grant）</td><td>ユーザーがクライアントに与えた「許可」。またはトークンを得る方式（grant type）。</td></tr>
+<tr><td>コールバック / リダイレクト URI</td><td>認可サーバーが認可コードを返すクライアント側の URL。事前登録が必要。</td></tr>
+<tr><td>コンフィデンシャル / パブリッククライアント</td><td>秘密（client_secret）を安全に保管できるか否かによる分類。</td></tr>
+<tr><td>スコープ</td><td>トークンで何ができるかを表す文字列。</td></tr>
+<tr><td>セッション</td><td>Cookie に入れた ID をキーに、サーバー側で利用者の状態を覚えておく仕組み。</td></tr>
+<tr><td>同意画面</td><td>「このアプリに次の権限を与えますか？」とユーザーに確認する認可サーバーの画面。</td></tr>
+<tr><td>認可コード</td><td>同意の結果としてフロントチャネルで渡される、短命・使い捨ての引換券。</td></tr>
+<tr><td>認可サーバー</td><td>ユーザーを認証し、同意を得て、トークンを発行するサーバー。</td></tr>
+<tr><td>バックチャネル</td><td>サーバー同士の直接通信。秘密情報を扱える。</td></tr>
+<tr><td>フロントチャネル</td><td>ブラウザのリダイレクトを経由する通信。漏洩・改ざんの可能性がある。</td></tr>
+<tr><td>リソースオーナー</td><td>データの持ち主（ユーザー）。</td></tr>
+<tr><td>リソースサーバー</td><td>データを持つ API サーバー。トークンを検証してからデータを返す。</td></tr>
+<tr><td>リフレッシュトークン</td><td>アクセストークンを再発行してもらうための長命なトークン。認可サーバーにだけ送る。</td></tr>
+<tr><td>CSRF</td><td>被害者のブラウザに意図しないリクエストを送らせる攻撃。OAuth では state で防ぐ。</td></tr>
+<tr><td>ID トークン</td><td>OpenID Connect で発行される、ユーザーの認証結果を表す署名付き JWT。</td></tr>
+<tr><td>JWT</td><td>JSON に電子署名を付けたトークン形式。中身を受け取った側で検証できる。</td></tr>
+<tr><td>PKCE</td><td>code_verifier / code_challenge により、認可コードの横取りを無力化する拡張（RFC 7636）。</td></tr>
+<tr><td>state</td><td>クライアントが認可リクエストに付けるランダム値。コールバック時に照合して CSRF を防ぐ。</td></tr>
+</tbody>
+</table></div>
+</section>
+
+<!-- ================================================================== -->
+<section id="references">
+<h2>15. 参考資料</h2>
+<ul>
+<li><a href="https://www.rfc-editor.org/rfc/rfc6749">RFC 6749</a> — The OAuth 2.0 Authorization Framework（本体）</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc6750">RFC 6750</a> — Bearer Token Usage（<code>Authorization: Bearer</code>、<code>WWW-Authenticate</code>）</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc7636">RFC 7636</a> — Proof Key for Code Exchange（PKCE）</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc7662">RFC 7662</a> — Token Introspection</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc9700">RFC 9700</a> — Best Current Practice for OAuth 2.0 Security</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc8628">RFC 8628</a> — Device Authorization Grant</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc8414">RFC 8414</a> — Authorization Server Metadata</li>
+<li><a href="https://oauth.net/2.1/">OAuth 2.1</a>（oauth.net の解説とドラフトへのリンク）</li>
+<li><a href="https://openid.net/specs/openid-connect-core-1_0.html">OpenID Connect Core 1.0</a></li>
+</ul>
+<details>
+<summary>教材リポジトリのファイル構成</summary>
+<pre><code class="language-text">src/oauth_sample/
+├── __init__.py          起動コマンド (uv run oauth-sample ...)
+├── config.py            ポート・クライアント登録・ユーザー・有効期限
+├── common.py            HTTP サーバー・ログ・セッション等の下回り (演習対象外)
+├── runner.py            3 サーバーの起動・停止
+├── exercise/            ★ 演習版 (TODO を埋める)
+│   ├── client.py
+│   ├── auth_server.py
+│   ├── resource_server.py
+│   └── pkce.py
+└── solution/            解答 (完成版)
+tests/
+├── conftest.py          --impl exercise|solution の切り替え
+├── test_step1.py ～ test_step8.py
+└── test_e2e.py          ブラウザ操作を再現した通しテスト
+tools/generate_exercise.py  解答版から演習版を再生成 (--force で上書き)</code></pre>
+</details>
+</section>
+
+</article>
+</div>
+</body>
+</html>

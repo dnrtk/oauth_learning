@@ -1,0 +1,23 @@
+[project]
+name = "oauth-sample"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "dnrtk", email = "dnrtk@yahoo.co.jp" }
+]
+requires-python = ">=3.14"
+dependencies = []
+
+[project.scripts]
+oauth-sample = "oauth_sample:main"
+
+[build-system]
+requires = ["uv_build>=0.12.24,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+]
